@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::f64::consts::E;
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -19,7 +17,7 @@ struct Layer {
 }
 
 impl Layer {
-    fn new(rng: &mut StdRng, neurons: usize, inputs_len: usize, activation: Activation) -> Self {
+    fn new(rng: &mut StdRng, inputs_len: usize, neurons: usize, activation: Activation) -> Self {
         let mut layer = Vec::with_capacity(neurons);
 
         for _ in 0..neurons {
@@ -28,10 +26,7 @@ impl Layer {
                 weights.push(rng.gen());
             }
 
-            layer.push(Neuron {
-                weights,
-                bias: rng.gen(),
-            });
+            layer.push(Neuron { weights, bias: 0.0 });
         }
 
         Self {
@@ -63,20 +58,52 @@ impl Layer {
         activated_outputs
     }
 
-    fn backward_pass(&self) {}
+    fn backward_pass(&mut self, learning_rate: f64, mut errors: Vec<f64>) -> Vec<f64> {
+        let deltas: Vec<f64> = self
+            .outputs
+            .iter()
+            .zip(errors.iter())
+            .map(|(output, error)| error * self.activation.derivative(*output))
+            .collect();
+
+        // Errors no longer needed so we re-init
+        errors = Vec::with_capacity(self.inputs.len());
+
+        for (neuron, (delta, input)) in self
+            .neurons
+            .iter_mut()
+            .zip(deltas.iter().zip(self.inputs.iter()))
+        {
+            // Update bias
+            neuron.bias -= learning_rate * delta;
+            for weight in neuron.weights.iter_mut() {
+                // Calculate error for next layer
+                errors.push(*weight * delta);
+
+                // Update weights
+                *weight -= learning_rate * delta * input;
+            }
+        }
+
+        errors
+    }
 }
 
-struct NeuralNetwork {
+pub struct NeuralNetwork {
     layers: Vec<Layer>,
     learning_rate: f64,
 }
 
 impl NeuralNetwork {
     pub fn new() -> Self {
-        let inputs_len = 1;
-        let learning_rate = 50.0;
+        let learning_rate = 0.5;
         let mut rng = StdRng::seed_from_u64(1337);
-        let layers = vec![Layer::new(&mut rng, 1, inputs_len, Activation::Sigmoid)];
+
+        let layers = vec![
+            Layer::new(&mut rng, 1, 10, Activation::Sigmoid),
+            Layer::new(&mut rng, 10, 10, Activation::Sigmoid),
+            Layer::new(&mut rng, 10, 1, Activation::Sigmoid),
+        ];
 
         Self {
             layers,
@@ -94,10 +121,12 @@ impl NeuralNetwork {
             for (inputs, targets) in training_inputs.iter().zip(training_targets.iter()) {
                 let outputs = self.feed_forward(inputs.clone());
 
-                println!(
-                    "Epoch: {epoch} inputs: {:?}, predictions: {:?}",
-                    &inputs, &outputs
-                );
+                if epoch % 100 == 0 {
+                    println!(
+                        "Epoch: {epoch} inputs: {:?}, predictions: {:?}",
+                        &inputs, &outputs
+                    );
+                }
 
                 self.back_propagate(&outputs, &targets);
             }
@@ -105,29 +134,14 @@ impl NeuralNetwork {
     }
 
     fn back_propagate(&mut self, outputs: &Vec<f64>, targets: &Vec<f64>) {
-        for layer in self.layers.iter_mut().rev() {
-            let errors: Vec<f64> = targets
-                .iter()
-                .zip(outputs.iter())
-                .map(|(target, output)| output - target)
-                .collect();
+        let mut errors: Vec<f64> = targets
+            .iter()
+            .zip(outputs.iter())
+            .map(|(target, output)| output - target)
+            .collect();
 
-            let deltas: Vec<f64> = layer
-                .outputs
-                .iter()
-                .zip(errors.iter())
-                .map(|(output, error)| error * layer.activation.derivative(*output))
-                .collect();
-            for (neuron, (delta, input)) in layer
-                .neurons
-                .iter_mut()
-                .zip(deltas.iter().zip(layer.inputs.iter()))
-            {
-                neuron.bias -= self.learning_rate * delta;
-                for weight in neuron.weights.iter_mut() {
-                    *weight -= self.learning_rate * delta * input;
-                }
-            }
+        for layer in self.layers.iter_mut().rev() {
+            errors = layer.backward_pass(self.learning_rate, errors);
         }
     }
 
@@ -140,6 +154,7 @@ impl NeuralNetwork {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum Activation {
     Sigmoid,
@@ -172,7 +187,7 @@ mod tests {
         let inputs = vec![vec![1.0], vec![0.0]];
         let targets = vec![vec![1.0], vec![0.0]];
 
-        nn.train(inputs, targets, 2500);
+        nn.train(inputs, targets, 25000);
 
         let should_be_0 = nn.feed_forward(vec![0.0])[0];
         assert!(should_be_0.round() == 0.0);
