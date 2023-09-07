@@ -147,6 +147,8 @@ impl NeuralNetwork {
         self
     }
 
+    /// # Examples
+    ///
     /// ```
     /// use rand::{SeedableRng, rngs::StdRng};
     ///
