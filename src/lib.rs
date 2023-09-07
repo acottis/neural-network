@@ -1,6 +1,6 @@
 use std::f64::consts::E;
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng};
 
 #[derive(Debug)]
 struct Neuron {
@@ -105,38 +105,59 @@ impl Layer {
     }
 }
 
+#[derive(Debug)]
 pub struct NeuralNetwork {
     layers: Vec<Layer>,
     learning_rate: f64,
-    inputs: usize,
+    inputs_len: usize,
     rng: StdRng,
 }
 
 impl NeuralNetwork {
-    pub fn new(inputs: usize) -> Self {
-        let learning_rate = 0.5;
-        let rng = StdRng::seed_from_u64(1337);
-
+    /// # Examples
+    /// ```
+    /// use rand::{rngs::StdRng, SeedableRng};
+    ///
+    /// let nn = nn::NeuralNetwork::new(2, 0.05, StdRng::seed_from_u64(1337));
+    /// ```
+    ///
+    /// ```
+    /// use rand::{rngs::StdRng, SeedableRng};
+    ///
+    /// let nn = nn::NeuralNetwork::new(4, 0.001, StdRng::from_entropy());
+    /// ```
+    pub fn new(inputs_len: usize, learning_rate: f64, rng: StdRng) -> Self {
         Self {
             layers: Vec::new(),
             learning_rate,
             rng,
-            inputs,
+            inputs_len,
         }
     }
 
-    pub fn layer(mut self, neurons: usize, activation: Activation) -> Self {
-        let inputs = match self.layers.last() {
+    pub fn layer(&mut self, neurons: usize, activation: Activation) -> &mut Self {
+        let inputs_len = match self.layers.last() {
             Some(layer) => layer.neurons.len(),
-            None => self.inputs,
+            None => self.inputs_len,
         };
 
         self.layers
-            .push(Layer::new(&mut self.rng, inputs, neurons, activation));
+            .push(Layer::new(&mut self.rng, inputs_len, neurons, activation));
 
         self
     }
 
+    /// ```
+    /// use rand::{SeedableRng, rngs::StdRng};
+    ///
+    /// let mut nn = nn::NeuralNetwork::new(1, 0.5, StdRng::from_entropy());
+    ///
+    /// nn.layer(5, nn::SIGMOID).layer(1, nn::SIGMOID);
+    ///
+    /// let inputs = vec![vec![1.0], vec![0.0]];
+    /// let targets = vec![vec![1.0], vec![0.0]];
+    /// nn.train(inputs, targets, 5);
+    /// ```
     pub fn train(
         &mut self,
         training_inputs: Vec<Vec<f64>>,
@@ -151,7 +172,7 @@ impl NeuralNetwork {
                 // Get the prediction for the training run
                 let outputs = self.feed_forward(inputs.clone());
 
-                if epoch % 100 == 0 {
+                if epoch % 1000 == 0 {
                     println!(
                         "Epoch: {} inputs: {:?}, predictions: {:?}",
                         epoch, &inputs, &outputs
@@ -178,6 +199,7 @@ impl NeuralNetwork {
 
     /// Returns our predicition for a layer
     pub fn feed_forward(&mut self, mut inputs: Vec<f64>) -> Vec<f64> {
+        assert!(inputs.len() == self.inputs_len);
         for layer in self.layers.iter_mut() {
             inputs = layer.forward_pass(&inputs);
         }
@@ -203,11 +225,14 @@ pub const IDENTITY: Activation = Activation {
 
 #[cfg(test)]
 mod tests {
+    use rand::{rngs::StdRng, SeedableRng};
+
     use super::*;
 
     #[test]
     fn one_sized_nn() {
-        let mut nn = NeuralNetwork::new(1).layer(5, SIGMOID).layer(1, SIGMOID);
+        let mut nn = NeuralNetwork::new(1, 0.5, StdRng::from_entropy());
+        nn.layer(5, SIGMOID).layer(1, SIGMOID);
 
         let inputs = vec![vec![1.0], vec![0.0]];
         let targets = vec![vec![1.0], vec![0.0]];
