@@ -119,7 +119,6 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize> NeuralNetwork<INPUTS_LEN
     /// use nn::*;
     ///
     /// let mut nn = NeuralNetworkBuilder::<2, 1>::new()
-    ///     .epochs(1000000)
     ///     .rng(StdRng::seed_from_u64(1337))
     ///     .learning_rate(0.00005)
     ///     .output_layer(IDENTITY);
@@ -221,7 +220,6 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize> NeuralNetwork<INPUTS_LEN
 /// use nn::*;
 ///
 /// let mut nn = NeuralNetworkBuilder::<2, 1>::new()
-///     .epochs(1000000)
 ///     .rng(StdRng::seed_from_u64(1337))
 ///     .learning_rate(0.00005)
 ///     .layer(5, SIGMOID)
@@ -229,7 +227,6 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize> NeuralNetwork<INPUTS_LEN
 /// ```
 pub struct NeuralNetworkBuilder<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize> {
     learning_rate: f64,
-    epochs: usize,
     rng: StdRng,
     cost_function: CostFunction,
     layer_layout: Vec<(usize, Activation)>,
@@ -244,7 +241,6 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize>
     pub fn new() -> Self {
         Self {
             learning_rate: 0.025,
-            epochs: 1,
             rng: StdRng::from_entropy(),
             cost_function: MEAN_SQUARED,
             layer_layout: Vec::new(),
@@ -260,11 +256,10 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize>
         self
     }
 
-    /// The number of times the same training data will be run
-    /// against our model, the more we train the more danger of overfitting
-    /// we run in to in complex problems. Default is 1
-    pub fn epochs(mut self, epochs: usize) -> Self {
-        self.epochs = epochs;
+    /// The cost function we use to evaluate how far we are from our target
+    /// which influences how much we adjust by, default is [MEAN_SQUARED]
+    pub fn cost_function(mut self, cost_function: CostFunction) -> Self {
+        self.cost_function = cost_function;
         self
     }
 
@@ -417,7 +412,6 @@ mod tests {
     #[test]
     fn nn_sum_2_numbers() {
         let mut nn = NeuralNetworkBuilder::<2, 1>::new()
-            .epochs(1000)
             .learning_rate(0.00005)
             .output_layer(IDENTITY);
 

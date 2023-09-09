@@ -4,7 +4,6 @@
 
 ```rust
 let mut nn = NeuralNetworkBuilder::<2, 1>::new()
-    .epochs(1000000)
     .learning_rate(0.00005)
     .output_layer(IDENTITY);
 
