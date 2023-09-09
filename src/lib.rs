@@ -363,6 +363,29 @@ mod tests {
     }
 
     #[test]
+    fn builder_correct_layer_sizes() {
+        let nn = NeuralNetworkBuilder::<6, 25>::new()
+            .learning_rate(0.5)
+            .layer(10, SIGMOID)
+            .layer(5, RELU)
+            .output_layer(IDENTITY);
+
+        assert!(nn.layers.len() == 3, "{}", nn.layers.len());
+        assert!(nn.layers[0].neurons.len() == 10);
+        assert!(nn.layers[0].neurons[0].weights.len() == 6);
+
+        assert!(nn.layers[1].neurons.len() == 5);
+        assert!(nn.layers[1].neurons[0].weights.len() == 10);
+
+        assert!(nn.layers[2].neurons.len() == 25);
+        assert!(nn.layers[2].neurons[0].weights.len() == 5);
+
+        assert!(
+            nn.layers.get(3).is_none(),
+            "There should not be a 4th layer"
+        );
+    }
+    #[test]
     fn builder_learning_rate() {
         const LEARNING_RATE: f64 = 46.7;
         let nn = NeuralNetworkBuilder::<1, 1>::new()
@@ -394,7 +417,7 @@ mod tests {
     #[test]
     fn nn_sum_2_numbers() {
         let mut nn = NeuralNetworkBuilder::<2, 1>::new()
-            .epochs(1000000)
+            .epochs(1000)
             .learning_rate(0.00005)
             .output_layer(IDENTITY);
 
