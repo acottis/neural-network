@@ -49,7 +49,7 @@ impl Layer {
     /// This is the hot loop
     fn forward_pass(&mut self, inputs: &Vec<f64>) -> Vec<f64> {
         // TODO: This needs to go
-        let mut layer_outputs = Vec::with_capacity(self.neurons.len());
+        let mut activateds = Vec::with_capacity(self.neurons.len());
 
         // Save our inputs for backward propagation
         self.inputs.clear();
@@ -69,9 +69,9 @@ impl Layer {
             *output += neuron.bias;
 
             // Activate our neuron and add to our return
-            layer_outputs.push((self.activation.function)(*output));
+            activateds.push((self.activation.function)(*output));
         }
-        layer_outputs
+        activateds
     }
 
     /// Calculate our errors and update weights/biases
@@ -106,27 +106,33 @@ impl Layer {
 pub struct NeuralNetwork {
     layers: Vec<Layer>,
     learning_rate: f64,
+    cost_function: CostFunction,
     inputs_len: usize,
     rng: StdRng,
 }
 
-impl NeuralNetwork {
+impl<const INPUTS_LEN: const usize> NeuralNetwork<INPUTS_LEN> {
     /// # Examples
     /// ```
     /// use rand::{rngs::StdRng, SeedableRng};
     ///
-    /// let nn = nn::NeuralNetwork::new(2, 0.05, StdRng::seed_from_u64(1337));
+    /// let nn = nn::NeuralNetwork::new(2, 0.05, nn::MEAN_SQUARED_ERROR, StdRng::seed_from_u64(1337));
     /// ```
     ///
     /// ```
     /// use rand::{rngs::StdRng, SeedableRng};
     ///
-    /// let nn = nn::NeuralNetwork::new(4, 0.001, StdRng::from_entropy());
+    /// let nn = nn::NeuralNetwork::new(4, 0.001, nn::MEAN_SQUARED_ERROR, StdRng::from_entropy());
     /// ```
-    pub fn new(inputs_len: usize, learning_rate: f64, rng: StdRng) -> Self {
+    pub fn new(
+        learning_rate: f64,
+        cost_function: CostFunction,
+        rng: StdRng,
+    ) -> Self {
         Self {
             layers: Vec::new(),
             learning_rate,
+            cost_function,
             rng,
             inputs_len,
         }
@@ -148,7 +154,7 @@ impl NeuralNetwork {
     /// ```
     /// use rand::{SeedableRng, rngs::StdRng};
     ///
-    /// let mut nn = nn::NeuralNetwork::new(1, 0.5, StdRng::from_entropy());
+    /// let mut nn = nn::NeuralNetwork::new(1, 0.5, nn::MEAN_SQUARED_ERROR, StdRng::from_entropy());
     ///
     /// nn.layer(5, nn::SIGMOID).layer(1, nn::SIGMOID);
     ///
@@ -168,7 +174,7 @@ impl NeuralNetwork {
         for epoch in 0..epochs {
             for (inputs, targets) in training_inputs.iter().zip(training_targets.iter()) {
                 // Get the prediction for the training run
-                let outputs = self.feed_forward(inputs.clone());
+                let activateds = self.feed_forward(inputs.clone());
 
                 //                if epoch % 1000 == 0 {
                 //                    println!(
@@ -178,16 +184,16 @@ impl NeuralNetwork {
                 //                }
 
                 // Update our weights based on how far prediction is from expected
-                self.back_propagate(&outputs, &targets);
+                self.back_propagate(&activateds, targets);
             }
         }
     }
 
-    fn back_propagate(&mut self, outputs: &Vec<f64>, targets: &Vec<f64>) {
-        let mut errors: Vec<f64> = outputs
+    fn back_propagate(&mut self, activateds: &Vec<f64>, targets: &Vec<f64>) {
+        let mut errors: Vec<f64> = activateds
             .iter()
             .zip(targets.iter())
-            .map(|(output, target)| output - target)
+            .map(self.cost_function.derivative)
             .collect();
 
         for layer in self.layers.iter_mut().rev() {
@@ -204,6 +210,17 @@ impl NeuralNetwork {
         inputs
     }
 }
+
+#[derive(Debug)]
+pub struct CostFunction {
+    function: fn(activated: f64, target: f64) -> f64,
+    derivative: fn((&f64, &f64)) -> f64,
+}
+
+pub const MEAN_SQUARED_ERROR: CostFunction = CostFunction {
+    function: |activated, target| (activated - target).powi(2),
+    derivative: |(activated, target)| activated - target,
+};
 
 #[derive(Debug)]
 pub struct Activation {
@@ -234,13 +251,13 @@ mod tests {
 
     #[test]
     fn one_sized_nn() {
-        let mut nn = NeuralNetwork::new(1, 0.5, StdRng::from_entropy());
+        let mut nn = NeuralNetwork::new(1, 0.5, MEAN_SQUARED_ERROR, StdRng::from_entropy());
         nn.layer(5, SIGMOID).layer(1, SIGMOID);
 
         let inputs = vec![vec![1.0], vec![0.0]];
         let targets = vec![vec![1.0], vec![0.0]];
 
-        nn.train(inputs, targets, 25000);
+        nn.train(inputs, targets, 250);
 
         let should_be_0 = nn.feed_forward(vec![0.0])[0];
         assert!(should_be_0.round() == 0.0);
