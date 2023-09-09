@@ -1,19 +1,33 @@
 # Neural Network
 
-# Examples
+## Examples
 
 ```rust
-use rand::{SeedableRng, rngs::StdRng};
+let mut nn = NeuralNetworkBuilder::<2, 1>::new()
+    .epochs(1000000)
+    .learning_rate(0.00005)
+    .output_layer(IDENTITY);
 
-let mut nn = nn::NeuralNetwork::new(1, 0.5, StdRng::from_entropy());
+let mut rng = StdRng::from_entropy();
+let mut inputs = Vec::with_capacity(10000);
+let mut targets = Vec::with_capacity(10000);
 
-nn.layer(5, nn::SIGMOID).layer(1, nn::SIGMOID);
+(0..100).for_each(|_| {
+    let rand1 = rng.gen_range(0.0..10.0);
+    let rand2 = rng.gen_range(0.0..rand1);
+    let input = [rand2, rand1 - rand2];
+    targets.push([input[0] + input[1]]);
+    inputs.push(input);
+});
 
-let inputs = vec![vec![1.0], vec![0.0]];
-let targets = vec![vec![1.0], vec![0.0]];
-nn.train(inputs, targets, 5);
+nn.train(inputs, targets, 100);
 
-let should_be_0 = nn.feed_forward(vec![0.0])[0];
+let should_be_6 = nn.feed_forward([4.0, 2.0])[0];
+assert!(should_be_6.round() == 6.0, "{}", should_be_6.round());
+
+let should_be_3 = nn.feed_forward([1.0, 2.0])[0];
+assert!(should_be_3.round() == 3.0, "{}", should_be_3.round());
 ```
 
-
+## TODO
+Implement callbacks from inside NerualNetwork
