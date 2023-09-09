@@ -27,8 +27,9 @@ struct Layer {
 impl Layer {
     fn new(rng: &mut StdRng, inputs: usize, neurons: usize, activation: Activation) -> Self {
         let mut neurons = Vec::with_capacity(neurons);
+        let neurons_count = neurons.capacity();
 
-        for _ in 0..neurons.capacity() {
+        for _ in 0..neurons_count {
             let mut weights = Vec::with_capacity(inputs);
 
             for _ in 0..inputs {
@@ -40,7 +41,7 @@ impl Layer {
         Self {
             neurons,
             inputs: Vec::with_capacity(inputs),
-            outputs: vec![0.0; inputs],
+            outputs: vec![0.0; neurons_count],
             activation,
         }
     }
@@ -85,14 +86,10 @@ impl Layer {
         // Errors no longer needed so we re-init
         errors.clear();
 
-        for (neuron, (delta, input)) in self
-            .neurons
-            .iter_mut()
-            .zip(deltas.iter().zip(self.inputs.iter()))
-        {
+        for (neuron, delta) in self.neurons.iter_mut().zip(deltas.iter()) {
             // Update bias
             neuron.bias -= learning_rate * delta;
-            for weight in neuron.weights.iter_mut() {
+            for (weight, input) in neuron.weights.iter_mut().zip(self.inputs.iter()) {
                 // Calculate error for next layer
                 errors.push(*weight * delta);
 
@@ -143,7 +140,6 @@ impl NeuralNetwork {
 
         self.layers
             .push(Layer::new(&mut self.rng, inputs_len, neurons, activation));
-
         self
     }
 
@@ -174,12 +170,12 @@ impl NeuralNetwork {
                 // Get the prediction for the training run
                 let outputs = self.feed_forward(inputs.clone());
 
-                if epoch % 1000 == 0 {
-                    println!(
-                        "Epoch: {} inputs: {:?}, predictions: {:?}",
-                        epoch, &inputs, &outputs
-                    );
-                }
+                //                if epoch % 1000 == 0 {
+                //                    println!(
+                //                        "Epoch: {} inputs: {:?}, predictions: {:?}",
+                //                        epoch, &inputs, &outputs
+                //                    );
+                //                }
 
                 // Update our weights based on how far prediction is from expected
                 self.back_propagate(&outputs, &targets);
@@ -223,6 +219,11 @@ pub const SIGMOID: Activation = Activation {
 pub const IDENTITY: Activation = Activation {
     function: |x| x * 1.0,
     derivative: |_| 1.0,
+};
+
+pub const RELU: Activation = Activation {
+    function: |x| x.max(0.0),
+    derivative: |x| if x > 0.0 { 1.0 } else { 0.0 },
 };
 
 #[cfg(test)]
