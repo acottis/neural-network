@@ -103,15 +103,14 @@ impl Layer {
 }
 
 #[derive(Debug)]
-pub struct NeuralNetwork {
+pub struct NeuralNetwork<const INPUTS_LEN: usize> {
     layers: Vec<Layer>,
     learning_rate: f64,
     cost_function: CostFunction,
-    inputs_len: usize,
     rng: StdRng,
 }
 
-impl<const INPUTS_LEN: const usize> NeuralNetwork<INPUTS_LEN> {
+impl<const INPUTS_LEN: usize> NeuralNetwork<INPUTS_LEN> {
     /// # Examples
     /// ```
     /// use rand::{rngs::StdRng, SeedableRng};
@@ -124,24 +123,19 @@ impl<const INPUTS_LEN: const usize> NeuralNetwork<INPUTS_LEN> {
     ///
     /// let nn = nn::NeuralNetwork::new(4, 0.001, nn::MEAN_SQUARED_ERROR, StdRng::from_entropy());
     /// ```
-    pub fn new(
-        learning_rate: f64,
-        cost_function: CostFunction,
-        rng: StdRng,
-    ) -> Self {
+    pub fn new(learning_rate: f64, cost_function: CostFunction, rng: StdRng) -> Self {
         Self {
             layers: Vec::new(),
             learning_rate,
             cost_function,
             rng,
-            inputs_len,
         }
     }
 
     pub fn layer(&mut self, neurons: usize, activation: Activation) -> &mut Self {
         let inputs_len = match self.layers.last() {
             Some(layer) => layer.neurons.len(),
-            None => self.inputs_len,
+            None => INPUTS_LEN,
         };
 
         self.layers
@@ -203,7 +197,7 @@ impl<const INPUTS_LEN: const usize> NeuralNetwork<INPUTS_LEN> {
 
     /// Returns our predicition for a layer
     pub fn feed_forward(&mut self, mut inputs: Vec<f64>) -> Vec<f64> {
-        assert!(inputs.len() == self.inputs_len);
+        assert!(inputs.len() == INPUTS_LEN);
         for layer in self.layers.iter_mut() {
             inputs = layer.forward_pass(&inputs);
         }
@@ -251,7 +245,7 @@ mod tests {
 
     #[test]
     fn one_sized_nn() {
-        let mut nn = NeuralNetwork::new(1, 0.5, MEAN_SQUARED_ERROR, StdRng::from_entropy());
+        let mut nn = NeuralNetwork::<1>::new(0.5, MEAN_SQUARED_ERROR, StdRng::from_entropy());
         nn.layer(5, SIGMOID).layer(1, SIGMOID);
 
         let inputs = vec![vec![1.0], vec![0.0]];
