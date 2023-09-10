@@ -155,25 +155,33 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize> NeuralNetwork<INPUTS_LEN
         );
 
         for epoch in 0..epochs {
+            let mut costs = Vec::with_capacity(training_inputs.len());
+
             for (inputs, targets) in training_inputs.iter().zip(training_targets.iter()) {
                 // Get the prediction for the training run
                 let predictions = self.feed_forward(*inputs);
 
                 // Update our weights based on how far prediction is from expected
-                let cost = self.back_propagate(predictions, &targets);
+                self.back_propagate(predictions, &targets);
 
-                if epoch < 1000 || epoch % 1000 == 0 {
-                    info!("EPOCH {epoch:2}: Cost {cost}");
-                }
+                let cost: f64 = predictions
+                    .iter()
+                    .zip(targets.iter())
+                    .map(|(prediction, target)| (self.cost_function.function)(*prediction, *target))
+                    .reduce(|acc, cost| acc + cost)
+                    .unwrap();
+                costs.push(cost);
+            }
+
+            if epoch < 50 || epoch % 100 == 0 {
+                let sum_costs = costs.into_iter().reduce(|acc, cost| acc + cost).unwrap();
+                let cost = sum_costs / training_inputs.len() as f64;
+                info!("EPOCH {epoch:2} Cost: {cost:9.6}");
             }
         }
     }
 
-    fn back_propagate(
-        &mut self,
-        activateds: [f64; OUTPUTS_LEN],
-        targets: &[f64; OUTPUTS_LEN],
-    ) -> f64 {
+    fn back_propagate(&mut self, activateds: [f64; OUTPUTS_LEN], targets: &[f64; OUTPUTS_LEN]) {
         let mut errors: Vec<f64> = activateds
             .iter()
             .zip(targets.iter())
@@ -183,15 +191,6 @@ impl<const INPUTS_LEN: usize, const OUTPUTS_LEN: usize> NeuralNetwork<INPUTS_LEN
         for layer in self.layers.iter_mut().rev() {
             errors = layer.backward_pass(self.learning_rate, errors);
         }
-
-        let cost: f64 = activateds
-            .iter()
-            .zip(targets.iter())
-            .map(|(activated, target)| (self.cost_function.function)(*activated, *target))
-            .reduce(|acc, cost| acc + cost)
-            .unwrap();
-        let average_cost = cost / activateds.len() as f64;
-        average_cost
     }
 
     /// Returns our predicition for a layer
